@@ -1,0 +1,2143 @@
+[file name]: deepseek_html_20251121_98c3be.html
+[file content begin]
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Civil Works Manager Pro</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React & ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    
+    <!-- Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        /* Mobile optimizations */
+        body {
+            -webkit-tap-highlight-color: transparent;
+            background-color: #f3f4f6;
+        }
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        /* Smooth transitions */
+        .page-enter {
+            animation: slideIn 0.2s ease-out forwards;
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        /* Print styles */
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white; }
+            .print-break { page-break-after: always; }
+        }
+        /* Custom scrollbar */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 2px;
+        }
+        /* Loading animation */
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .animate-pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useRef } = React;
+
+        // --- Icons ---
+        const Icon = ({ name, size = 20, className = "" }) => {
+            useEffect(() => {
+                lucide.createIcons();
+            }, [name]);
+            return <i data-lucide={name} className={className} style={{ width: size, height: size }}></i>;
+        };
+
+        // --- Utility Functions ---
+        const formatCurrency = (amount) => {
+            return new Intl.NumberFormat('en-IN', {
+                style: 'currency',
+                currency: 'INR',
+                maximumFractionDigits: 2
+            }).format(amount);
+        };
+
+        const formatDate = (dateString) => {
+            if(!dateString) return '';
+            return new Date(dateString).toLocaleDateString('en-IN', {
+                day: 'numeric', month: 'short', year: 'numeric'
+            });
+        };
+
+        const getOrdinal = (n) => {
+            const s = ["th", "st", "nd", "rd"];
+            const v = n % 100;
+            return n + (s[(v - 20) % 10] || s[v] || s[0]);
+        };
+
+        const generateId = () => Math.random().toString(36).substr(2, 9);
+
+        const downloadJSON = (data, filename) => {
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        };
+
+        // --- NEW: PDF Export Function ---
+        const generatePDF = (work, bills, contractors) => {
+            const printWindow = window.open('', '_blank');
+            const totalPaid = bills.reduce((sum, b) => sum + b.netPayable, 0);
+            const totalBudget = (work.budgets || []).reduce((sum, b) => sum + (b.amount || 0), 0);
+            
+            printWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Work Report - ${work.name}</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; margin: 20px; }
+                        .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 20px; }
+                        .section { margin-bottom: 20px; }
+                        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+                        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                        th { background-color: #f5f5f5; }
+                        .summary { background: #f9f9f9; padding: 15px; border-radius: 5px; }
+                        .positive { color: green; }
+                        .negative { color: red; }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <h1>Work Progress Report</h1>
+                        <h2>${work.name}</h2>
+                        <p>Location: ${work.location} | Contractor: ${work.contractor || 'Not specified'}</p>
+                        <p>Generated on: ${new Date().toLocaleDateString()}</p>
+                    </div>
+
+                    <div class="section">
+                        <h3>Financial Summary</h3>
+                        <div class="summary">
+                            <p><strong>Total Budget:</strong> ${formatCurrency(totalBudget)}</p>
+                            <p><strong>Total Spent:</strong> ${formatCurrency(totalPaid)}</p>
+                            <p><strong>Remaining:</strong> <span class="${totalBudget - totalPaid >= 0 ? 'positive' : 'negative'}">${formatCurrency(totalBudget - totalPaid)}</span></p>
+                            <p><strong>Utilization:</strong> ${totalBudget > 0 ? Math.round((totalPaid / totalBudget) * 100) : 0}%</p>
+                        </div>
+                    </div>
+
+                    <div class="section">
+                        <h3>Budget Allocation</h3>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Installment</th>
+                                    <th>Amount</th>
+                                    <th>Date</th>
+                                    <th>Remark</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${(work.budgets || []).map((budget, index) => `
+                                    <tr>
+                                        <td>${getOrdinal(index + 1)}</td>
+                                        <td>${formatCurrency(budget.amount)}</td>
+                                        <td>${formatDate(budget.date)}</td>
+                                        <td>${budget.remark || '-'}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="section">
+                        <h3>Bill History (${bills.length} Bills)</h3>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Bill #</th>
+                                    <th>Date</th>
+                                    <th>NVW</th>
+                                    <th>GST</th>
+                                    <th>Gross</th>
+                                    <th>Deductions</th>
+                                    <th>Net Payable</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${bills.map(bill => `
+                                    <tr>
+                                        <td>${bill.billNumber}</td>
+                                        <td>${formatDate(bill.date)}</td>
+                                        <td>${formatCurrency(bill.nvw)}</td>
+                                        <td>${formatCurrency(bill.gstAmount)}</td>
+                                        <td>${formatCurrency(bill.grossAmount)}</td>
+                                        <td>${formatCurrency(bill.totalDeductions)}</td>
+                                        <td><strong>${formatCurrency(bill.netPayable)}</strong></td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+            setTimeout(() => {
+                printWindow.print();
+            }, 500);
+        };
+
+        // --- NEW: Monthly Summary PDF Export Function ---
+        const generateMonthlySummaryPDF = (monthlyBills, selectedMonth, selectedYear, summary, works) => {
+            const printWindow = window.open('', '_blank');
+            const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+            
+            printWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Monthly Summary - ${months[selectedMonth]} ${selectedYear}</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; margin: 20px; }
+                        .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 20px; }
+                        .section { margin-bottom: 20px; }
+                        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+                        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                        th { background-color: #f5f5f5; }
+                        .summary { background: #f9f9f9; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+                        .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+                        .stat-card { background: #f0f8ff; padding: 15px; border-radius: 8px; border-left: 4px solid #007bff; }
+                        .positive { color: green; }
+                        .negative { color: red; }
+                        .text-right { text-align: right; }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <h1>Monthly Summary Report</h1>
+                        <h2>${months[selectedMonth]} ${selectedYear}</h2>
+                        <p>Generated on: ${new Date().toLocaleDateString()}</p>
+                    </div>
+
+                    <div class="section">
+                        <h3>Financial Summary</h3>
+                        <div class="summary">
+                            <div class="stat-grid">
+                                <div class="stat-card">
+                                    <h4>Total Bills</h4>
+                                    <p style="font-size: 24px; font-weight: bold; margin: 5px 0;">${summary.billCount}</p>
+                                </div>
+                                <div class="stat-card">
+                                    <h4>Total Net Payable</h4>
+                                    <p style="font-size: 24px; font-weight: bold; margin: 5px 0; color: green;">${formatCurrency(summary.totalNet)}</p>
+                                </div>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                <div>
+                                    <p><strong>Total NVW:</strong> ${formatCurrency(summary.totalNVW)}</p>
+                                    <p><strong>Total GST:</strong> ${formatCurrency(summary.totalGST)}</p>
+                                </div>
+                                <div>
+                                    <p><strong>Total Gross:</strong> ${formatCurrency(summary.totalGross)}</p>
+                                    <p><strong>Total Deductions:</strong> <span class="negative">-${formatCurrency(summary.totalDeductions)}</span></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="section">
+                        <h3>Bill Details (${monthlyBills.length} Bills)</h3>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Bill #</th>
+                                    <th>Date</th>
+                                    <th>Work Name</th>
+                                    <th>NVW</th>
+                                    <th>GST</th>
+                                    <th>Gross</th>
+                                    <th>Deductions</th>
+                                    <th>Net Payable</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${monthlyBills.map(bill => {
+                                    const work = works.find(w => w.id === bill.workId);
+                                    return `
+                                        <tr>
+                                            <td>${bill.billNumber}</td>
+                                            <td>${formatDate(bill.date)}</td>
+                                            <td>${work?.name || 'Unknown Work'}</td>
+                                            <td>${formatCurrency(bill.nvw)}</td>
+                                            <td>${formatCurrency(bill.gstAmount)}</td>
+                                            <td>${formatCurrency(bill.grossAmount)}</td>
+                                            <td class="negative">-${formatCurrency(bill.totalDeductions)}</td>
+                                            <td class="text-right"><strong>${formatCurrency(bill.netPayable)}</strong></td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                            <tfoot>
+                                <tr style="background-color: #f5f5f5; font-weight: bold;">
+                                    <td colspan="3">TOTAL</td>
+                                    <td>${formatCurrency(summary.totalNVW)}</td>
+                                    <td>${formatCurrency(summary.totalGST)}</td>
+                                    <td>${formatCurrency(summary.totalGross)}</td>
+                                    <td class="negative">-${formatCurrency(summary.totalDeductions)}</td>
+                                    <td class="text-right">${formatCurrency(summary.totalNet)}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+            setTimeout(() => {
+                printWindow.print();
+            }, 500);
+        };
+
+        // --- Helper Components ---
+        const MoneyInput = ({ label, value, onChange, isNegative = false }) => (
+            <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                <label className="text-xs text-gray-500 uppercase font-semibold block mb-1">{label}</label>
+                <div className="flex items-center">
+                    <span className={`text-lg font-bold mr-1 ${isNegative ? 'text-red-500' : 'text-gray-700'}`}>
+                        {isNegative ? '-' : ''}₹
+                    </span>
+                    <input 
+                        type="number" 
+                        inputMode="decimal"
+                        className="bg-transparent text-lg font-bold w-full outline-none text-gray-900 placeholder-gray-300"
+                        placeholder="0"
+                        value={value}
+                        onChange={e => onChange(e.target.value)}
+                    />
+                </div>
+            </div>
+        );
+
+        // NEW: Modal Component
+        const Modal = ({ isOpen, onClose, title, children, size = "md" }) => {
+            if (!isOpen) return null;
+            
+            const sizeClasses = {
+                sm: "max-w-sm",
+                md: "max-w-md",
+                lg: "max-w-lg",
+                xl: "max-w-xl"
+            };
+            
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                    <div className={`bg-white rounded-2xl w-full ${sizeClasses[size]} max-h-[90vh] overflow-hidden`}>
+                        <div className="flex items-center justify-between p-4 border-b">
+                            <h3 className="text-lg font-bold">{title}</h3>
+                            <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded">
+                                <Icon name="x" size={20} />
+                            </button>
+                        </div>
+                        <div className="p-4 overflow-y-auto max-h-[70vh] custom-scrollbar">
+                            {children}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // NEW: Loading Spinner Component
+        const LoadingSpinner = ({ size = 24, className = "" }) => (
+            <div className={`animate-spin rounded-full border-2 border-gray-300 border-t-blue-600 ${className}`} 
+                 style={{ width: size, height: size }}></div>
+        );
+
+        // NEW: Delete Confirmation Modal Component
+        const DeleteConfirmationModal = ({ isOpen, onClose, onConfirm, title, message, confirmText = "Delete", cancelText = "Cancel" }) => {
+            if (!isOpen) return null;
+            
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl w-full max-w-sm">
+                        <div className="p-6">
+                            <div className="flex items-center justify-center w-12 h-12 mx-auto bg-red-100 rounded-full mb-4">
+                                <Icon name="alert-triangle" className="text-red-600" size={24} />
+                            </div>
+                            <h3 className="text-lg font-bold text-center mb-2">{title}</h3>
+                            <p className="text-gray-600 text-center text-sm mb-6">{message}</p>
+                            <div className="flex gap-3">
+                                <button 
+                                    onClick={onClose}
+                                    className="flex-1 py-3 bg-gray-100 text-gray-700 font-semibold rounded-lg hover:bg-gray-200 transition-colors"
+                                >
+                                    {cancelText}
+                                </button>
+                                <button 
+                                    onClick={onConfirm}
+                                    className="flex-1 py-3 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-colors"
+                                >
+                                    {confirmText}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- Components ---
+
+        // 1. Main App Container
+        const App = () => {
+            // State
+            const [view, setView] = useState('HOME');
+            const [works, setWorks] = useState(() => {
+                const saved = localStorage.getItem('works');
+                return saved ? JSON.parse(saved) : [];
+            });
+            const [bills, setBills] = useState(() => {
+                const saved = localStorage.getItem('bills');
+                return saved ? JSON.parse(saved) : [];
+            });
+            const [contractors, setContractors] = useState(() => {
+                const saved = localStorage.getItem('contractors');
+                return saved ? JSON.parse(saved) : [];
+            });
+            
+            // Selection State
+            const [selectedWorkId, setSelectedWorkId] = useState(null);
+            const [editingWork, setEditingWork] = useState(null);
+            const [editingBill, setEditingBill] = useState(null);
+            const [selectedContractor, setSelectedContractor] = useState(null);
+            
+            const [searchTerm, setSearchTerm] = useState('');
+            const [showSettings, setShowSettings] = useState(false);
+            const [isLoading, setIsLoading] = useState(false);
+
+            // NEW: Delete Modal State
+            const [deleteModal, setDeleteModal] = useState({
+                isOpen: false,
+                workId: null,
+                workName: '',
+                billCount: 0
+            });
+
+            // Persistence
+            useEffect(() => localStorage.setItem('works', JSON.stringify(works)), [works]);
+            useEffect(() => localStorage.setItem('bills', JSON.stringify(bills)), [bills]);
+            useEffect(() => localStorage.setItem('contractors', JSON.stringify(contractors)), [contractors]);
+            useEffect(() => lucide.createIcons(), [view]);
+
+            // Navigation Handlers
+            const goHome = () => {
+                setSelectedWorkId(null);
+                setEditingWork(null);
+                setEditingBill(null);
+                setSelectedContractor(null);
+                setView('HOME');
+            };
+
+            const handleAddNewWork = () => {
+                setEditingWork(null);
+                setView('WORK_FORM');
+            };
+
+            const handleEditWork = (work) => {
+                setEditingWork(work);
+                setView('WORK_FORM');
+            };
+            
+            const goToWorkDetail = (workId) => {
+                setSelectedWorkId(workId);
+                setEditingBill(null);
+                setView('WORK_DETAIL');
+            };
+
+            const handleAddNewBill = () => {
+                setEditingBill(null);
+                setView('BILL_FORM');
+            };
+
+            const handleEditBill = (bill) => {
+                setEditingBill(bill);
+                setView('BILL_FORM');
+            };
+            
+            const goToContractorList = () => {
+                setView('CONTRACTOR_LIST');
+            };
+
+            const goToContractorDetail = (name) => {
+                setSelectedContractor(name);
+                setView('CONTRACTOR_DETAIL');
+            };
+
+            // NEW: Monthly Summary Navigation
+            const goToMonthlySummary = () => {
+                setView('MONTHLY_SUMMARY');
+            };
+
+            // NEW: Delete Work Handler
+            const handleDeleteWork = (workId) => {
+                const work = works.find(w => w.id === workId);
+                const workBills = bills.filter(b => b.workId === workId);
+                
+                setDeleteModal({
+                    isOpen: true,
+                    workId: workId,
+                    workName: work?.name || 'Unknown Work',
+                    billCount: workBills.length
+                });
+            };
+
+            // NEW: Confirm Delete Work
+            const confirmDeleteWork = () => {
+                const { workId } = deleteModal;
+                
+                // Delete the work
+                setWorks(works.filter(w => w.id !== workId));
+                
+                // Delete all associated bills
+                setBills(bills.filter(b => b.workId !== workId));
+                
+                // Close modal
+                setDeleteModal({ isOpen: false, workId: null, workName: '', billCount: 0 });
+                
+                // Navigate to home if the deleted work was currently selected
+                if (selectedWorkId === workId) {
+                    goHome();
+                }
+            };
+
+            // NEW: Data Management Handlers
+            const handleExportData = () => {
+                setIsLoading(true);
+                setTimeout(() => {
+                    const data = { 
+                        works, 
+                        bills, 
+                        contractors, 
+                        exportDate: new Date().toISOString(),
+                        version: '1.0'
+                    };
+                    downloadJSON(data, `civil-works-backup-${new Date().toISOString().split('T')[0]}.json`);
+                    setIsLoading(false);
+                    setShowSettings(false);
+                }, 500);
+            };
+
+            const handleImportData = (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                setIsLoading(true);
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    setTimeout(() => {
+                        try {
+                            const data = JSON.parse(e.target.result);
+                            if (data.works) setWorks(data.works);
+                            if (data.bills) setBills(data.bills);
+                            if (data.contractors) setContractors(data.contractors);
+                            setShowSettings(false);
+                            alert('Data imported successfully!');
+                        } catch (error) {
+                            alert('Error importing data. Please check the file format.');
+                        }
+                        setIsLoading(false);
+                    }, 1000);
+                };
+                reader.readAsText(file);
+                event.target.value = '';
+            };
+
+            const handleClearAllData = () => {
+                if (confirm('Are you sure you want to clear ALL data? This action cannot be undone.')) {
+                    setIsLoading(true);
+                    setTimeout(() => {
+                        setWorks([]);
+                        setBills([]);
+                        setContractors([]);
+                        setShowSettings(false);
+                        goHome();
+                        setIsLoading(false);
+                    }, 800);
+                }
+            };
+
+            // Data Handlers
+            const handleAddContractor = (name) => {
+                if (name && !contractors.includes(name)) {
+                    setContractors([...contractors, name]);
+                }
+            };
+
+            const handleSaveWork = (workData) => {
+                if (workData.contractor) {
+                    handleAddContractor(workData.contractor);
+                }
+
+                if (editingWork) {
+                    setWorks(works.map(w => w.id === workData.id ? workData : w));
+                    if (selectedWorkId === workData.id) {
+                        setView('WORK_DETAIL');
+                    } else {
+                        setView('HOME');
+                    }
+                } else {
+                    setWorks([workData, ...works]);
+                    setView('HOME');
+                }
+                setEditingWork(null);
+            };
+
+            const handleSaveBill = (billData) => {
+                if (editingBill) {
+                    setBills(bills.map(b => b.id === billData.id ? billData : b));
+                } else {
+                    setBills([billData, ...bills]);
+                }
+                setEditingBill(null);
+                setView('WORK_DETAIL');
+            };
+            
+            const handleEditBillFromContractor = (bill) => {
+                setSelectedWorkId(bill.workId);
+                setEditingBill(bill);
+                setView('BILL_FORM');
+            };
+
+            // NEW: Delete bill handler
+            const handleDeleteBill = (billId) => {
+                if (confirm('Are you sure you want to delete this bill?')) {
+                    setBills(bills.filter(b => b.id !== billId));
+                }
+            };
+
+            // NEW: Get sorted bills for a work (sorted by date, most recent first)
+            const getSortedWorkBills = (workId) => {
+                return bills
+                    .filter(b => b.workId === workId)
+                    .sort((a, b) => new Date(b.date) - new Date(a.date));
+            };
+
+            const activeWork = works.find(w => w.id === selectedWorkId);
+            const workBills = getSortedWorkBills(selectedWorkId);
+
+            return (
+                <div className="max-w-md mx-auto bg-gray-50 min-h-screen flex flex-col relative shadow-2xl overflow-hidden">
+                    {/* Loading Overlay */}
+                    {isLoading && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+                            <div className="bg-white p-6 rounded-2xl flex items-center gap-3">
+                                <LoadingSpinner size={32} />
+                                <span className="font-semibold">Processing...</span>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {/* View Router */}
+                    {view === 'HOME' && (
+                        <HomeView 
+                            works={works}
+                            bills={bills} 
+                            searchTerm={searchTerm} 
+                            setSearchTerm={setSearchTerm}
+                            onAddWork={handleAddNewWork}
+                            onSelectWork={goToWorkDetail}
+                            onOpenContractors={goToContractorList}
+                            onOpenSettings={() => setShowSettings(true)}
+                            onOpenMonthlySummary={goToMonthlySummary}
+                            onDeleteWork={handleDeleteWork}
+                        />
+                    )}
+
+                    {view === 'CONTRACTOR_LIST' && (
+                        <ContractorListView 
+                            contractors={contractors}
+                            onBack={goHome}
+                            onSelect={goToContractorDetail}
+                        />
+                    )}
+
+                    {view === 'CONTRACTOR_DETAIL' && selectedContractor && (
+                        <ContractorDetailView 
+                            contractorName={selectedContractor}
+                            works={works}
+                            bills={bills}
+                            onBack={goToContractorList}
+                            onEditBill={handleEditBillFromContractor}
+                        />
+                    )}
+
+                    {/* NEW: Monthly Summary View */}
+                    {view === 'MONTHLY_SUMMARY' && (
+                        <MonthlySummaryView 
+                            works={works}
+                            bills={bills}
+                            onBack={goHome}
+                            onEditBill={handleEditBill}
+                            onExportPDF={generateMonthlySummaryPDF}
+                        />
+                    )}
+
+                    {view === 'WORK_FORM' && (
+                        <WorkFormView 
+                            initialData={editingWork}
+                            contractors={contractors}
+                            onBack={() => editingWork && selectedWorkId ? setView('WORK_DETAIL') : goHome()} 
+                            onSave={handleSaveWork} 
+                        />
+                    )}
+
+                    {view === 'WORK_DETAIL' && activeWork && (
+                        <WorkDetailView 
+                            work={activeWork}
+                            bills={workBills}
+                            onBack={goHome}
+                            onEditWork={() => handleEditWork(activeWork)}
+                            onAddBill={handleAddNewBill}
+                            onEditBill={handleEditBill}
+                            onDeleteWork={() => handleDeleteWork(activeWork.id)}
+                            onDeleteBill={handleDeleteBill}
+                            onExportPDF={() => generatePDF(activeWork, workBills, contractors)}
+                        />
+                    )}
+
+                    {view === 'BILL_FORM' && activeWork && (
+                        <BillFormView 
+                            work={activeWork}
+                            initialData={editingBill}
+                            nextBillNumber={workBills.length + 1}
+                            onBack={() => setView('WORK_DETAIL')}
+                            onSave={handleSaveBill}
+                        />
+                    )}
+
+                    {/* NEW: Delete Confirmation Modal */}
+                    <DeleteConfirmationModal 
+                        isOpen={deleteModal.isOpen}
+                        onClose={() => setDeleteModal({ isOpen: false, workId: null, workName: '', billCount: 0 })}
+                        onConfirm={confirmDeleteWork}
+                        title="Delete Work"
+                        message={`Are you sure you want to delete "${deleteModal.workName}"? This will also delete ${deleteModal.billCount} associated running bill${deleteModal.billCount !== 1 ? 's' : ''}. This action cannot be undone.`}
+                        confirmText="Delete Work & Bills"
+                    />
+
+                    {/* NEW: Settings Modal */}
+                    <Modal isOpen={showSettings} onClose={() => setShowSettings(false)} title="Data Management">
+                        <div className="space-y-4">
+                            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                                <h4 className="font-bold text-blue-800 mb-2">Export Data</h4>
+                                <p className="text-sm text-blue-600 mb-3">Download a backup of all your data.</p>
+                                <button 
+                                    onClick={handleExportData}
+                                    className="w-full bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+                                >
+                                    <Icon name="download" className="inline mr-2" size={16} />
+                                    Export Backup
+                                </button>
+                            </div>
+
+                            <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                                <h4 className="font-bold text-green-800 mb-2">Import Data</h4>
+                                <p className="text-sm text-green-600 mb-3">Restore from a previous backup.</p>
+                                <label className="w-full bg-green-600 text-white py-2 rounded-lg font-semibold hover:bg-green-700 transition-colors text-center block cursor-pointer">
+                                    <Icon name="upload" className="inline mr-2" size={16} />
+                                    Import Backup
+                                    <input 
+                                        type="file" 
+                                        accept=".json" 
+                                        onChange={handleImportData}
+                                        className="hidden"
+                                    />
+                                </label>
+                            </div>
+
+                            <div className="bg-red-50 p-4 rounded-lg border border-red-200">
+                                <h4 className="font-bold text-red-800 mb-2">Danger Zone</h4>
+                                <p className="text-sm text-red-600 mb-3">Permanently delete all data.</p>
+                                <button 
+                                    onClick={handleClearAllData}
+                                    className="w-full bg-red-600 text-white py-2 rounded-lg font-semibold hover:bg-red-700 transition-colors"
+                                >
+                                    <Icon name="trash-2" className="inline mr-2" size={16} />
+                                    Clear All Data
+                                </button>
+                            </div>
+
+                            <div className="text-xs text-gray-500 text-center pt-4">
+                                <p>Data is stored locally in your browser.</p>
+                                <p>Export regularly to prevent data loss.</p>
+                            </div>
+                        </div>
+                    </Modal>
+                </div>
+            );
+        };
+
+        // 2. Home View (Enhanced with Statistics and Monthly Summary Button)
+        const HomeView = ({ works, bills, searchTerm, setSearchTerm, onAddWork, onSelectWork, onOpenContractors, onOpenSettings, onOpenMonthlySummary, onDeleteWork }) => {
+            const [showStats, setShowStats] = useState(false);
+
+            const filteredWorks = works.filter(w => 
+                w.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                (w.contractor || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                w.location.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+
+            // NEW: Statistics Calculation
+            const stats = useMemo(() => {
+                const totalWorks = works.length;
+                const totalBills = bills.length;
+                const totalSpent = bills.reduce((sum, b) => sum + b.netPayable, 0);
+                const totalBudget = works.reduce((sum, w) => 
+                    sum + (w.budgets || []).reduce((bSum, b) => bSum + (b.amount || 0), 0), 0
+                );
+                const totalSavings = totalBudget - totalSpent;
+                const activeContractors = [...new Set(works.map(w => w.contractor).filter(Boolean))].length;
+
+                return { totalWorks, totalBills, totalSpent, totalBudget, totalSavings, activeContractors };
+            }, [works, bills]);
+
+            return (
+                <div className="flex flex-col h-screen page-enter">
+                    {/* Header */}
+                    <div className="bg-blue-600 pt-12 pb-6 px-6 rounded-b-3xl shadow-lg z-10">
+                        <div className="flex justify-between items-center mb-4">
+                            <div>
+                                <h1 className="text-2xl font-bold text-white">Works Manager Pro</h1>
+                                <p className="text-blue-100 text-sm">Track works & budgets</p>
+                            </div>
+                            <div className="flex gap-2">
+                                <button onClick={onOpenMonthlySummary} className="bg-white/20 p-2 rounded-full text-white hover:bg-white/30 transition-colors">
+                                    <Icon name="calendar" size={20} />
+                                </button>
+                                <button onClick={onOpenContractors} className="bg-white/20 p-2 rounded-full text-white hover:bg-white/30 transition-colors">
+                                    <Icon name="users" size={20} />
+                                </button>
+                                <button onClick={() => setShowStats(!showStats)} className="bg-white/20 p-2 rounded-full text-white hover:bg-white/30 transition-colors">
+                                    <Icon name="bar-chart-3" size={20} />
+                                </button>
+                                <button onClick={onOpenSettings} className="bg-white/20 p-2 rounded-full text-white hover:bg-white/30 transition-colors">
+                                    <Icon name="settings" size={20} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* NEW: Quick Stats */}
+                        {showStats && (
+                            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 mb-4 border border-white/20">
+                                <div className="grid grid-cols-2 gap-3 text-white text-xs">
+                                    <div>
+                                        <p className="opacity-80">Total Works</p>
+                                        <p className="font-bold text-lg">{stats.totalWorks}</p>
+                                    </div>
+                                    <div>
+                                        <p className="opacity-80">Total Bills</p>
+                                        <p className="font-bold text-lg">{stats.totalBills}</p>
+                                    </div>
+                                    <div>
+                                        <p className="opacity-80">Contractors</p>
+                                        <p className="font-bold text-lg">{stats.activeContractors}</p>
+                                    </div>
+                                    <div>
+                                        <p className="opacity-80">Total Spent</p>
+                                        <p className="font-bold text-lg">{formatCurrency(stats.totalSpent)}</p>
+                                    </div>
+                                </div>
+                                <div className="mt-3 pt-3 border-t border-white/20">
+                                    <div className="flex justify-between text-xs">
+                                        <span>Total Budget: {formatCurrency(stats.totalBudget)}</span>
+                                        <span className={stats.totalSavings >= 0 ? 'text-green-300' : 'text-red-300'}>
+                                            Savings: {formatCurrency(stats.totalSavings)}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Search Bar */}
+                        <div className="relative">
+                            <Icon name="search" className="absolute left-3 top-3 text-gray-400" size={18} />
+                            <input 
+                                type="text" 
+                                placeholder="Search works, contractor..." 
+                                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white text-gray-800 shadow-inner focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                            {searchTerm && (
+                                <button 
+                                    onClick={() => setSearchTerm('')}
+                                    className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                                >
+                                    <Icon name="x" size={16} />
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* List */}
+                    <div className="flex-1 overflow-y-auto p-4 space-y-3 pb-24 custom-scrollbar">
+                        {filteredWorks.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center h-64 text-gray-400">
+                                <Icon name="folder-open" size={48} className="mb-2 opacity-50" />
+                                <p className="mb-2">No works found.</p>
+                                {searchTerm && (
+                                    <button 
+                                        onClick={() => setSearchTerm('')}
+                                        className="text-blue-600 text-sm font-semibold hover:text-blue-700"
+                                    >
+                                        Clear search
+                                    </button>
+                                )}
+                                {works.length === 0 && (
+                                    <button 
+                                        onClick={onAddWork}
+                                        className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+                                    >
+                                        Create Your First Work
+                                    </button>
+                                )}
+                            </div>
+                        ) : (
+                            filteredWorks.map(work => {
+                                const workBills = bills.filter(b => b.workId === work.id);
+                                const totalSpent = workBills.reduce((sum, b) => sum + b.netPayable, 0);
+                                const totalBudget = (work.budgets || []).reduce((sum, b) => sum + (parseFloat(b.amount)||0), 0);
+                                const totalSaving = totalBudget - totalSpent;
+                                const progressPercent = totalBudget > 0 ? Math.min((totalSpent / totalBudget) * 100, 100) : 0;
+
+                                return (
+                                    <div 
+                                        key={work.id} 
+                                        className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow relative group"
+                                    >
+                                        {/* Delete Button - Always visible on hover */}
+                                        <button 
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onDeleteWork(work.id);
+                                            }}
+                                            className="absolute top-3 right-3 p-2 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 shadow-lg"
+                                            title="Delete Work"
+                                        >
+                                            <Icon name="trash-2" size={16} />
+                                        </button>
+
+                                        {/* Work Content */}
+                                        <div 
+                                            onClick={() => onSelectWork(work.id)}
+                                            className="cursor-pointer active:scale-95 transition-transform pr-10"
+                                        >
+                                            <div className="flex justify-between items-start mb-3">
+                                                <div className="flex-1 pr-2">
+                                                    <h3 className="font-bold text-gray-800 leading-tight">{work.name}</h3>
+                                                    <div className="mt-1 space-y-1">
+                                                        <p className="text-xs text-gray-500 flex items-center">
+                                                            <Icon name="map-pin" size={10} className="mr-1" /> {work.location}
+                                                        </p>
+                                                        {work.contractor && (
+                                                            <p className="text-xs text-blue-600 flex items-center font-medium">
+                                                                <Icon name="user" size={10} className="mr-1" /> {work.contractor}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex flex-col items-end text-right min-w-[90px]">
+                                                    <div className="mb-1">
+                                                        <p className="text-[10px] text-gray-400 uppercase font-bold">Spent</p>
+                                                        <p className="text-sm font-bold text-gray-800">{formatCurrency(totalSpent)}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-[10px] text-gray-400 uppercase font-bold">Savings</p>
+                                                        <p className={`text-sm font-bold ${totalSaving >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                                                            {formatCurrency(totalSaving)}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* NEW: Progress Bar */}
+                                            <div className="w-full bg-gray-200 rounded-full h-2">
+                                                <div 
+                                                    className={`h-2 rounded-full transition-all duration-500 ${
+                                                        progressPercent > 90 ? 'bg-red-500' : 
+                                                        progressPercent > 75 ? 'bg-yellow-500' : 'bg-green-500'
+                                                    }`}
+                                                    style={{ width: `${progressPercent}%` }}
+                                                ></div>
+                                            </div>
+                                            <div className="flex justify-between text-xs text-gray-500 mt-1">
+                                                <span>{workBills.length} bills</span>
+                                                <span>{Math.round(progressPercent)}% spent</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        )}
+                    </div>
+
+                    {/* FAB */}
+                    <button 
+                        onClick={onAddWork}
+                        className="absolute bottom-6 right-6 bg-blue-600 text-white p-4 rounded-full shadow-xl hover:bg-blue-700 active:scale-90 transition-all z-40 shadow-2xl"
+                    >
+                        <Icon name="plus" size={28} />
+                    </button>
+                </div>
+            );
+        };
+
+        // NEW: Monthly Summary View Component
+        const MonthlySummaryView = ({ works, bills, onBack, onEditBill, onExportPDF }) => {
+            const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+            const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+
+            const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+            const years = Array.from({length: 5}, (_, i) => new Date().getFullYear() - i);
+
+            // Filter bills for selected month/year and sort by date (most recent first)
+            const monthlyBills = bills.filter(bill => {
+                const billDate = new Date(bill.date);
+                return billDate.getMonth() === selectedMonth && billDate.getFullYear() === selectedYear;
+            }).sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            // Calculate summary statistics
+            const summary = monthlyBills.reduce((acc, bill) => {
+                return {
+                    totalNVW: acc.totalNVW + (bill.nvw || 0),
+                    totalGST: acc.totalGST + (bill.gstAmount || 0),
+                    totalGross: acc.totalGross + (bill.grossAmount || 0),
+                    totalDeductions: acc.totalDeductions + (bill.totalDeductions || 0),
+                    totalNet: acc.totalNet + (bill.netPayable || 0),
+                    billCount: acc.billCount + 1
+                };
+            }, { totalNVW: 0, totalGST: 0, totalGross: 0, totalDeductions: 0, totalNet: 0, billCount: 0 });
+
+            // NEW: Handle PDF Export
+            const handleExportPDF = () => {
+                onExportPDF(monthlyBills, selectedMonth, selectedYear, summary, works);
+            };
+
+            return (
+                <div className="flex flex-col h-screen bg-white page-enter">
+                    {/* Header */}
+                    <div className="flex items-center p-4 border-b bg-white sticky top-0 z-20">
+                        <button onClick={onBack} className="p-2 -ml-2 text-gray-600 hover:bg-gray-100 rounded transition-colors">
+                            <Icon name="arrow-left" />
+                        </button>
+                        <h2 className="text-lg font-bold ml-2">Monthly Summary</h2>
+                        <button 
+                            onClick={handleExportPDF}
+                            className="ml-auto p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                        >
+                            <Icon name="printer" size={18} />
+                            <span className="text-sm font-semibold">Export PDF</span>
+                        </button>
+                    </div>
+
+                    {/* Month/Year Selector */}
+                    <div className="flex gap-3 p-4 border-b bg-gray-50">
+                        <select 
+                            value={selectedMonth} 
+                            onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+                            className="flex-1 bg-white border border-gray-300 rounded-lg p-3 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                            {months.map((month, index) => (
+                                <option key={index} value={index}>{month}</option>
+                            ))}
+                        </select>
+                        <select 
+                            value={selectedYear} 
+                            onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                            className="flex-1 bg-white border border-gray-300 rounded-lg p-3 font-semibold outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                            {years.map(year => (
+                                <option key={year} value={year}>{year}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* Summary Section */}
+                    <div className="bg-gradient-to-br from-blue-600 to-blue-800 text-white p-6">
+                        <h3 className="text-lg font-bold mb-4 text-center">
+                            {months[selectedMonth]} {selectedYear} Summary
+                        </h3>
+                        
+                        <div className="grid grid-cols-2 gap-4 text-center">
+                            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                                <p className="text-sm opacity-80">Total Bills</p>
+                                <p className="text-2xl font-bold">{summary.billCount}</p>
+                            </div>
+                            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                                <p className="text-sm opacity-80">Total Net</p>
+                                <p className="text-2xl font-bold">{formatCurrency(summary.totalNet)}</p>
+                            </div>
+                        </div>
+
+                        <div className="mt-4 space-y-2 text-sm">
+                            <div className="flex justify-between">
+                                <span className="opacity-80">Total NVW:</span>
+                                <span className="font-medium">{formatCurrency(summary.totalNVW)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="opacity-80">Total GST:</span>
+                                <span className="font-medium">{formatCurrency(summary.totalGST)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="opacity-80">Total Gross:</span>
+                                <span className="font-medium">{formatCurrency(summary.totalGross)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="opacity-80">Total Deductions:</span>
+                                <span className="font-medium text-red-200">-{formatCurrency(summary.totalDeductions)}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Bills List */}
+                    <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                        <h4 className="text-sm font-bold text-gray-600 mb-3 uppercase">Running Bills ({monthlyBills.length})</h4>
+                        
+                        {monthlyBills.length === 0 ? (
+                            <div className="text-center py-10 text-gray-400">
+                                <Icon name="file-text" size={48} className="mx-auto mb-2 opacity-50" />
+                                <p>No bills found for {months[selectedMonth]} {selectedYear}.</p>
+                            </div>
+                        ) : (
+                            monthlyBills.map(bill => {
+                                const work = works.find(w => w.id === bill.workId);
+                                return (
+                                    <div 
+                                        key={bill.id} 
+                                        onClick={() => onEditBill(bill)}
+                                        className="bg-white rounded-xl p-4 shadow-sm border border-gray-200 cursor-pointer hover:bg-blue-50 active:scale-95 transition-all"
+                                    >
+                                        <div className="flex justify-between items-start border-b border-dashed pb-2 mb-2">
+                                            <div>
+                                                <p className="text-xs font-bold text-blue-600">{work?.name}</p>
+                                                <p className="text-[10px] text-gray-500">RA Bill #{bill.billNumber} • {formatDate(bill.date)}</p>
+                                            </div>
+                                            <span className="font-bold text-green-600">{formatCurrency(bill.netPayable)}</span>
+                                        </div>
+                                        
+                                        <div className="grid grid-cols-3 gap-2 text-xs text-gray-600">
+                                            <div>
+                                                <span className="block text-[10px] text-gray-400">NVW</span>
+                                                {formatCurrency(bill.nvw)}
+                                            </div>
+                                            <div>
+                                                <span className="block text-[10px] text-gray-400">GST</span>
+                                                {formatCurrency(bill.gstAmount)}
+                                            </div>
+                                            <div>
+                                                <span className="block text-[10px] text-gray-400">Gross</span>
+                                                {formatCurrency(bill.grossAmount)}
+                                            </div>
+                                            <div>
+                                                <span className="block text-[10px] text-gray-400">IT</span>
+                                                {formatCurrency(bill.it)}
+                                            </div>
+                                            <div>
+                                                <span className="block text-[10px] text-gray-400">Cess</span>
+                                                {formatCurrency(bill.cess)}
+                                            </div>
+                                            <div>
+                                                <span className="block text-[10px] text-gray-400">Total Ded.</span>
+                                                <span className="text-red-500">-{formatCurrency(bill.totalDeductions)}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        // 3. Contractor List View
+        const ContractorListView = ({ contractors, onBack, onSelect }) => {
+            return (
+                <div className="flex flex-col h-screen bg-white page-enter">
+                    <div className="flex items-center p-4 border-b bg-white sticky top-0 z-20">
+                        <button onClick={onBack} className="p-2 -ml-2 text-gray-600 hover:bg-gray-100 rounded transition-colors">
+                            <Icon name="arrow-left" />
+                        </button>
+                        <h2 className="text-lg font-bold ml-2">Contractors</h2>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-2 custom-scrollbar">
+                        {contractors.length === 0 ? (
+                            <div className="text-center p-10 text-gray-400">
+                                <Icon name="users" size={48} className="mx-auto mb-2 opacity-50" />
+                                <p>No contractors found.</p>
+                            </div>
+                        ) : (
+                            contractors.map((c, i) => (
+                                <div key={i} onClick={() => onSelect(c)} className="p-4 border-b border-gray-100 hover:bg-blue-50 cursor-pointer flex justify-between items-center transition-colors">
+                                    <span className="font-semibold text-gray-800">{c}</span>
+                                    <Icon name="chevron-right" size={16} className="text-gray-400" />
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        // 4. Contractor Detail View (Enhanced with Print functionality)
+        const ContractorDetailView = ({ contractorName, works, bills, onBack, onEditBill }) => {
+            const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+            const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+
+            const contractorWorks = works.filter(w => w.contractor === contractorName).map(w => w.id);
+            
+            // NEW: Sort contractor bills by date (most recent first)
+            const contractorBills = bills.filter(b => {
+                if (!contractorWorks.includes(b.workId)) return false;
+                const d = new Date(b.date);
+                return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear;
+            }).sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            // Summations
+            const totals = contractorBills.reduce((acc, b) => ({
+                nvw: acc.nvw + (b.nvw || 0),
+                gst: acc.gst + (b.gstAmount || 0),
+                gross: acc.gross + (b.grossAmount || 0),
+                it: acc.it + (b.it || 0),
+                cess: acc.cess + (b.cess || 0),
+                deductions: acc.deductions + (b.totalDeductions || 0),
+                net: acc.net + (b.netPayable || 0)
+            }), { nvw: 0, gst: 0, gross: 0, it: 0, cess: 0, deductions: 0, net: 0 });
+
+            const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+            const years = Array.from({length: 5}, (_, i) => new Date().getFullYear() - i);
+
+            // NEW: Print Function
+            const handlePrint = () => {
+                window.print();
+            };
+
+            return (
+                <div className="flex flex-col h-screen bg-gray-50 page-enter">
+                    {/* Header */}
+                    <div className="bg-white border-b flex flex-col sticky top-0 z-30 shadow-md no-print">
+                        <div className="flex items-center p-4 pb-2">
+                            <button onClick={onBack} className="p-2 -ml-2 text-gray-600 hover:bg-gray-100 rounded transition-colors">
+                                <Icon name="arrow-left" />
+                            </button>
+                            <div className="ml-2 flex-1">
+                                <h2 className="text-lg font-bold text-gray-800">{contractorName}</h2>
+                                <p className="text-xs text-gray-500">Report Dashboard</p>
+                            </div>
+                            <button 
+                                onClick={handlePrint}
+                                className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                            >
+                                <Icon name="printer" size={18} />
+                            </button>
+                        </div>
+
+                        {/* Filters */}
+                        <div className="flex gap-2 px-4 pb-4 border-b border-gray-100">
+                            <select 
+                                value={selectedMonth} 
+                                onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+                                className="bg-gray-100 border border-gray-200 rounded-lg p-2 text-sm font-semibold outline-none hover:bg-gray-200 transition-colors"
+                            >
+                                {months.map((m, i) => <option key={i} value={i}>{m}</option>)}
+                            </select>
+                            <select 
+                                value={selectedYear} 
+                                onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                                className="bg-gray-100 border border-gray-200 rounded-lg p-2 text-sm font-semibold outline-none hover:bg-gray-200 transition-colors"
+                            >
+                                {years.map(y => <option key={y} value={y}>{y}</option>)}
+                            </select>
+                        </div>
+
+                        {/* Text Bar Summation Panel */}
+                        <div className="bg-gray-900 text-white p-4 text-xs shadow-inner">
+                            <div className="flex justify-between items-center border-b border-gray-700 pb-2 mb-2">
+                                <span className="text-gray-400 uppercase font-bold tracking-wide">Total Net Payable</span>
+                                <span className="font-bold text-xl text-green-400">{formatCurrency(totals.net)}</span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-x-8 gap-y-1.5">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-gray-400">NVW:</span>
+                                    <span className="font-medium">{formatCurrency(totals.nvw)}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-gray-400">GST:</span>
+                                    <span className="font-medium">{formatCurrency(totals.gst)}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-gray-400">Gross:</span>
+                                    <span className="font-medium">{formatCurrency(totals.gross)}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-gray-400">IT:</span>
+                                    <span className="font-medium text-red-200">{formatCurrency(totals.it)}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-gray-400">Cess:</span>
+                                    <span className="font-medium text-red-200">{formatCurrency(totals.cess)}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-gray-400">Tot. Ded:</span>
+                                    <span className="font-medium text-red-300">{formatCurrency(totals.deductions)}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Bill List */}
+                    <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                        {contractorBills.length === 0 ? (
+                            <div className="text-center py-10 text-gray-400">
+                                <Icon name="file-text" size={48} className="mx-auto mb-2 opacity-50" />
+                                <p>No bills found for this period.</p>
+                            </div>
+                        ) : (
+                            contractorBills.map(bill => {
+                                const work = works.find(w => w.id === bill.workId);
+                                return (
+                                    <div 
+                                        key={bill.id} 
+                                        onClick={() => onEditBill(bill)}
+                                        className="bg-white rounded-xl p-4 shadow-sm border border-gray-200 cursor-pointer hover:bg-blue-50 active:scale-95 transition-all no-print"
+                                    >
+                                        <div className="flex justify-between items-start border-b border-dashed pb-2 mb-2">
+                                            <div>
+                                                <p className="text-xs font-bold text-blue-600">{work?.name}</p>
+                                                <p className="text-[10px] text-gray-500">RA Bill #{bill.billNumber} • {formatDate(bill.date)}</p>
+                                            </div>
+                                            <span className="font-bold text-green-600">{formatCurrency(bill.netPayable)}</span>
+                                        </div>
+                                        
+                                        <div className="grid grid-cols-3 gap-2 text-xs text-gray-600">
+                                            <div>
+                                                <span className="block text-[10px] text-gray-400">NVW</span>
+                                                {formatCurrency(bill.nvw)}
+                                            </div>
+                                            <div>
+                                                <span className="block text-[10px] text-gray-400">GST</span>
+                                                {formatCurrency(bill.gstAmount)}
+                                            </div>
+                                            <div>
+                                                <span className="block text-[10px] text-gray-400">Gross</span>
+                                                {formatCurrency(bill.grossAmount)}
+                                            </div>
+                                            <div>
+                                                <span className="block text-[10px] text-gray-400">IT</span>
+                                                {formatCurrency(bill.it)}
+                                            </div>
+                                            <div>
+                                                <span className="block text-[10px] text-gray-400">Cess</span>
+                                                {formatCurrency(bill.cess)}
+                                            </div>
+                                            <div>
+                                                <span className="block text-[10px] text-gray-400">Total Ded.</span>
+                                                <span className="text-red-500">-{formatCurrency(bill.totalDeductions)}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        // 5. Work Form View (Enhanced with validation)
+        const WorkFormView = ({ initialData, contractors, onBack, onSave }) => {
+            const isEditing = !!initialData;
+            const [name, setName] = useState(initialData?.name || '');
+            const [location, setLocation] = useState(initialData?.location || '');
+            const [contractor, setContractor] = useState(initialData?.contractor || '');
+            
+            const [showContractorList, setShowContractorList] = useState(false);
+            
+            const [budgets, setBudgets] = useState(initialData?.budgets || []);
+            const [newBudgetAmount, setNewBudgetAmount] = useState('');
+            const [newBudgetDate, setNewBudgetDate] = useState('');
+            const [newBudgetRemark, setNewBudgetRemark] = useState('');
+            const [errors, setErrors] = useState({});
+
+            const filteredContractors = contractors.filter(c => 
+                c.toLowerCase().includes(contractor.toLowerCase()) && c !== contractor
+            );
+
+            const validateForm = () => {
+                const newErrors = {};
+                if (!name.trim()) newErrors.name = 'Work name is required';
+                if (budgets.length === 0) newErrors.budgets = 'At least one budget installment is required';
+                setErrors(newErrors);
+                return Object.keys(newErrors).length === 0;
+            };
+
+            const addBudget = () => {
+                if (!newBudgetAmount || !newBudgetDate) return;
+                
+                const amount = parseFloat(newBudgetAmount);
+                if (amount <= 0) {
+                    setErrors({...errors, budgetAmount: 'Amount must be greater than 0'});
+                    return;
+                }
+
+                setBudgets([...budgets, {
+                    id: generateId(),
+                    amount: amount,
+                    date: newBudgetDate,
+                    remark: newBudgetRemark || ''
+                }]);
+                setNewBudgetAmount('');
+                setNewBudgetDate('');
+                setNewBudgetRemark('');
+                setErrors({...errors, budgetAmount: null, budgets: null});
+            };
+
+            const removeBudget = (id) => {
+                setBudgets(budgets.filter(b => b.id !== id));
+                if (budgets.length === 1) {
+                    setErrors({...errors, budgets: 'At least one budget installment is required'});
+                }
+            };
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                if (!validateForm()) return;
+                
+                onSave({
+                    id: initialData?.id || generateId(),
+                    name: name.trim(),
+                    location: location.trim() || 'Unspecified',
+                    contractor: contractor.trim() || 'Unspecified',
+                    budgets,
+                    createdAt: initialData?.createdAt || new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                });
+            };
+
+            const totalBudget = budgets.reduce((sum, b) => sum + (b.amount || 0), 0);
+
+            return (
+                <div className="flex flex-col h-screen bg-white page-enter">
+                    <div className="flex items-center p-4 border-b bg-white sticky top-0 z-20">
+                        <button onClick={onBack} className="p-2 -ml-2 text-gray-600 hover:bg-gray-100 rounded transition-colors">
+                            <Icon name="arrow-left" />
+                        </button>
+                        <h2 className="text-lg font-bold ml-2">{isEditing ? 'Edit Work' : 'Add New Work'}</h2>
+                    </div>
+
+                    <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6 pb-24 custom-scrollbar">
+                        {/* Basic Details */}
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Work Name *</label>
+                                <input 
+                                    type="text" 
+                                    className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-colors ${
+                                        errors.name ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                                    }`}
+                                    placeholder="e.g. Road Const. Sector 4"
+                                    value={name}
+                                    onChange={e => {
+                                        setName(e.target.value);
+                                        if (errors.name) setErrors({...errors, name: null});
+                                    }}
+                                    required
+                                />
+                                {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
+                            </div>
+                            
+                            {/* Contractor with Auto-complete */}
+                            <div className="relative">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Contractor Name</label>
+                                <div className="relative">
+                                    <input 
+                                        type="text" 
+                                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-colors"
+                                        placeholder="Search or Add Contractor"
+                                        value={contractor}
+                                        onChange={e => {
+                                            setContractor(e.target.value);
+                                            setShowContractorList(true);
+                                        }}
+                                        onFocus={() => setShowContractorList(true)}
+                                        onBlur={() => setTimeout(() => setShowContractorList(false), 200)}
+                                    />
+                                    {contractor && (
+                                        <button 
+                                            type="button"
+                                            onClick={() => setContractor('')}
+                                            className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 transition-colors"
+                                        >
+                                            <Icon name="x" size={16}/>
+                                        </button>
+                                    )}
+                                </div>
+                                
+                                {/* Dropdown */}
+                                {showContractorList && filteredContractors.length > 0 && (
+                                    <div className="absolute z-50 w-full bg-white border border-gray-200 rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto custom-scrollbar">
+                                        {filteredContractors.map((c, idx) => (
+                                            <div 
+                                                key={idx}
+                                                className="p-3 hover:bg-blue-50 cursor-pointer border-b last:border-0 text-sm text-gray-700 transition-colors"
+                                                onClick={() => {
+                                                    setContractor(c);
+                                                    setShowContractorList(false);
+                                                }}
+                                            >
+                                                {c}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Location / Site</label>
+                                <input 
+                                    type="text" 
+                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-colors"
+                                    placeholder="e.g. Main Highway"
+                                    value={location}
+                                    onChange={e => setLocation(e.target.value)}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Budget Allocations */}
+                        <div className="pt-4 border-t border-gray-100">
+                            <h3 className="font-bold text-gray-800 mb-3 flex items-center">
+                                <Icon name="coins" size={18} className="mr-2 text-yellow-600"/> Allocated Budget *
+                            </h3>
+                            
+                            {errors.budgets && (
+                                <p className="text-red-500 text-xs mb-3 bg-red-50 p-2 rounded border border-red-200">
+                                    {errors.budgets}
+                                </p>
+                            )}
+                            
+                            {/* Budget List */}
+                            <div className="space-y-3 mb-4">
+                                {budgets.map((b, index) => (
+                                    <div key={b.id} className="bg-white border border-gray-200 p-3 rounded-lg relative hover:border-gray-300 transition-colors">
+                                        <div className="absolute top-0 left-0 bg-gray-100 text-gray-600 text-[10px] font-bold px-2 py-1 rounded-br-lg border-r border-b border-gray-200">
+                                            {getOrdinal(index + 1)} Installment
+                                        </div>
+                                        <div className="flex justify-between items-center mt-4 mb-1">
+                                            <p className="font-bold text-gray-800">{formatCurrency(b.amount)}</p>
+                                            <button type="button" onClick={() => removeBudget(b.id)} className="text-red-400 p-2 hover:text-red-600 transition-colors">
+                                                <Icon name="trash-2" size={16} />
+                                            </button>
+                                        </div>
+                                        <div className="flex justify-between text-xs text-gray-500">
+                                            <span>{formatDate(b.date)}</span>
+                                            {b.remark && <span className="bg-gray-50 px-2 py-0.5 rounded text-gray-600">{b.remark}</span>}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            
+                            {/* Add Budget Input */}
+                            <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 mb-4">
+                                <div className="text-xs font-bold text-blue-600 uppercase mb-3">
+                                    Add {getOrdinal(budgets.length + 1)} Installment
+                                </div>
+                                <div className="grid grid-cols-2 gap-3 mb-3">
+                                    <div>
+                                        <label className="text-xs text-gray-500 mb-1 block">Date *</label>
+                                        <input 
+                                            type="date" 
+                                            className={`w-full p-2 border rounded-lg text-sm bg-white transition-colors ${
+                                                errors.budgetDate ? 'border-red-300' : 'border-gray-300'
+                                            }`}
+                                            value={newBudgetDate}
+                                            onChange={e => setNewBudgetDate(e.target.value)}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs text-gray-500 mb-1 block">Amount *</label>
+                                        <input 
+                                            type="number" 
+                                            className={`w-full p-2 border rounded-lg text-sm bg-white transition-colors ${
+                                                errors.budgetAmount ? 'border-red-300' : 'border-gray-300'
+                                            }`}
+                                            placeholder="₹ Amount"
+                                            value={newBudgetAmount}
+                                            onChange={e => {
+                                                setNewBudgetAmount(e.target.value);
+                                                if (errors.budgetAmount) setErrors({...errors, budgetAmount: null});
+                                            }}
+                                            min="0"
+                                            step="0.01"
+                                        />
+                                        {errors.budgetAmount && <p className="text-red-500 text-xs mt-1">{errors.budgetAmount}</p>}
+                                    </div>
+                                    <div className="col-span-2">
+                                        <label className="text-xs text-gray-500 mb-1 block">Remark (Optional)</label>
+                                        <input 
+                                            type="text" 
+                                            className="w-full p-2 border border-gray-300 rounded-lg text-sm bg-white transition-colors"
+                                            placeholder="e.g. Advance payment"
+                                            value={newBudgetRemark}
+                                            onChange={e => setNewBudgetRemark(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                                <button 
+                                    type="button"
+                                    onClick={addBudget}
+                                    disabled={!newBudgetAmount || !newBudgetDate}
+                                    className={`w-full py-2 rounded-lg text-sm font-semibold transition-all ${
+                                        (!newBudgetAmount || !newBudgetDate) 
+                                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed' 
+                                        : 'bg-gray-800 text-white hover:bg-gray-900'
+                                    }`}
+                                >
+                                    Add {getOrdinal(budgets.length + 1)} Installment
+                                </button>
+                            </div>
+                            
+                            {budgets.length > 0 && (
+                                <div className="mt-4 flex justify-between items-center pt-4 border-t border-dashed">
+                                    <span className="font-semibold text-gray-600">Total Allocated</span>
+                                    <span className="font-bold text-green-600 text-lg">{formatCurrency(totalBudget)}</span>
+                                </div>
+                            )}
+                        </div>
+                    </form>
+
+                    <div className="fixed bottom-0 left-0 w-full p-4 bg-white border-t z-30">
+                        <button 
+                            onClick={handleSubmit}
+                            className="w-full bg-blue-600 text-white font-semibold py-3.5 rounded-xl shadow-md hover:bg-blue-700 active:bg-blue-800 transition-colors"
+                        >
+                            {isEditing ? 'Save Changes' : 'Create Work'}
+                        </button>
+                    </div>
+                </div>
+            );
+        };
+
+        // 6. Work Detail View (Enhanced with PDF export and delete options)
+        const WorkDetailView = ({ work, bills, onBack, onEditWork, onAddBill, onEditBill, onDeleteWork, onDeleteBill, onExportPDF }) => {
+            const totalPaid = bills.reduce((sum, b) => sum + b.netPayable, 0);
+            const totalBudget = (work.budgets || []).reduce((sum, b) => sum + (b.amount || 0), 0);
+            const percentUsed = totalBudget > 0 ? Math.min((totalPaid / totalBudget) * 100, 100) : 0;
+            const totalSavings = totalBudget - totalPaid;
+
+            const [showActions, setShowActions] = useState(false);
+
+            return (
+                <div className="flex flex-col h-screen page-enter">
+                    {/* Header */}
+                    <div className="bg-white p-4 border-b flex items-center sticky top-0 z-20 shadow-sm">
+                        <button onClick={onBack} className="p-2 -ml-2 text-gray-600 hover:bg-gray-100 rounded transition-colors">
+                            <Icon name="arrow-left" />
+                        </button>
+                        <div className="ml-2 flex-1 overflow-hidden">
+                            <h2 className="text-lg font-bold truncate">{work.name}</h2>
+                            <p className="text-xs text-gray-500">{work.location}</p>
+                        </div>
+                        <div className="flex gap-1">
+                            <button onClick={() => setShowActions(!showActions)} className="p-2 bg-gray-100 rounded-full text-gray-600 hover:bg-gray-200 transition-colors">
+                                <Icon name="more-vertical" size={18} />
+                            </button>
+                            <button onClick={onEditWork} className="p-2 bg-gray-100 rounded-full text-gray-600 hover:bg-gray-200 transition-colors">
+                                <Icon name="edit-3" size={18} />
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Actions Menu */}
+                    {showActions && (
+                        <div className="absolute top-16 right-4 bg-white rounded-xl shadow-lg border border-gray-200 z-40 py-2 min-w-[160px]">
+                            <button 
+                                onClick={() => {
+                                    onExportPDF();
+                                    setShowActions(false);
+                                }}
+                                className="w-full text-left px-4 py-2 hover:bg-gray-50 flex items-center gap-2 transition-colors"
+                            >
+                                <Icon name="download" size={16} />
+                                Export PDF
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    onDeleteWork();
+                                    setShowActions(false);
+                                }}
+                                className="w-full text-left px-4 py-2 hover:bg-gray-50 flex items-center gap-2 text-red-600 transition-colors"
+                            >
+                                <Icon name="trash-2" size={16} />
+                                Delete Work
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Stats Card */}
+                    <div className="p-4">
+                        <div className="bg-gray-900 rounded-2xl p-5 text-white shadow-lg relative overflow-hidden">
+                            {/* Progress Bar Background */}
+                            <div className="absolute bottom-0 left-0 h-1 bg-gray-700 w-full">
+                                <div className="h-full bg-green-500 transition-all duration-500" style={{ width: `${percentUsed}%` }}></div>
+                            </div>
+
+                            <div className="flex justify-between items-start mb-4">
+                                <div>
+                                    <p className="text-gray-400 text-xs uppercase tracking-wider">Spent</p>
+                                    <h3 className="text-2xl font-bold mt-1">{formatCurrency(totalPaid)}</h3>
+                                    <div className="mt-2">
+                                        <p className="text-xs text-gray-400">Budget: {formatCurrency(totalBudget)}</p>
+                                        <p className={`text-xs font-medium ${totalSavings >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                            Saving: {formatCurrency(totalSavings)}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex flex-col items-end">
+                                    <div className="bg-gray-800 p-2 rounded-lg mb-2">
+                                        <span className="text-sm font-bold text-green-400">{Math.round(percentUsed)}%</span>
+                                    </div>
+                                    {work.contractor && (
+                                        <span className="text-[10px] bg-blue-900 text-blue-200 px-2 py-1 rounded-full border border-blue-800">
+                                            {work.contractor}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                            
+                            <div className="flex items-center text-xs text-gray-500 border-t border-gray-700 pt-3 mt-2">
+                                <Icon name="layers" size={12} className="mr-1" />
+                                <span>{bills.length} Bills Processed</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Bills List Header */}
+                    <div className="px-4 py-2 flex justify-between items-center bg-gray-50">
+                        <h3 className="text-sm font-bold text-gray-600 uppercase">Bill History</h3>
+                        <span className="text-[10px] text-gray-400">Tap to edit</span>
+                    </div>
+
+                    {/* Bills List */}
+                    <div className="flex-1 overflow-y-auto px-4 pb-24 space-y-3 custom-scrollbar">
+                        {bills.length === 0 ? (
+                            <div className="text-center py-12 text-gray-400">
+                                <Icon name="file-text" size={48} className="mx-auto mb-2 opacity-50" />
+                                <p>No bills created yet.</p>
+                                <p className="text-xs mt-2">Tap + to add the first Running Bill.</p>
+                            </div>
+                        ) : (
+                            bills.map(bill => (
+                                <div 
+                                    key={bill.id} 
+                                    className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm relative overflow-hidden hover:shadow-md transition-shadow group"
+                                >
+                                    <button 
+                                        onClick={() => onDeleteBill(bill.id)}
+                                        className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                                    >
+                                        <Icon name="x" size={12} />
+                                    </button>
+                                    <div 
+                                        onClick={() => onEditBill(bill)}
+                                        className="cursor-pointer active:bg-gray-50"
+                                    >
+                                        <div className="absolute top-0 right-0 bg-blue-100 text-blue-800 text-[10px] font-bold px-2 py-1 rounded-bl-lg">
+                                            RA BILL #{bill.billNumber}
+                                        </div>
+                                        <div className="flex justify-between items-end">
+                                            <div>
+                                                <p className="text-xs text-gray-400">{formatDate(bill.date)}</p>
+                                                <p className="font-semibold text-gray-800 mt-1">Gross: {formatCurrency(bill.grossAmount)}</p>
+                                                <p className="text-xs text-red-500 mt-1">Ded: -{formatCurrency(bill.totalDeductions)}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-xs text-gray-500">Net Payable</p>
+                                                <p className="text-lg font-bold text-green-600">{formatCurrency(bill.netPayable)}</p>
+                                            </div>
+                                        </div>
+                                        <Icon name="chevron-right" size={16} className="absolute bottom-4 right-2 text-gray-300 opacity-50" />
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+
+                    {/* FAB */}
+                    <button 
+                        onClick={onAddBill}
+                        className="absolute bottom-6 right-6 bg-black text-white p-4 rounded-full shadow-xl hover:bg-gray-800 active:scale-90 transition-all flex items-center gap-2 pr-6 z-30 shadow-2xl"
+                    >
+                        <Icon name="plus" size={24} />
+                        <span className="font-semibold">Add Bill</span>
+                    </button>
+                </div>
+            );
+        };
+
+        // 7. Bill Form View (Enhanced with validation and better UX)
+        const BillFormView = ({ work, initialData, nextBillNumber, onBack, onSave }) => {
+            const isEditing = !!initialData;
+            const billNum = isEditing ? initialData.billNumber : nextBillNumber;
+
+            // Form State
+            const [billDate, setBillDate] = useState(initialData?.date ? initialData.date.substr(0, 10) : new Date().toISOString().substr(0, 10));
+            const [nvw, setNvw] = useState(initialData?.nvw?.toString() || '');
+            const [gstRate, setGstRate] = useState(initialData?.gstRate || 18);
+            const [itRate, setItRate] = useState(initialData?.itRate || 2); 
+            const [cessRate, setCessRate] = useState(initialData?.cessRate || 1); 
+            const [penalty, setPenalty] = useState(initialData?.penalty?.toString() || '');
+            
+            // Custom Deductions State
+            const [customDeductions, setCustomDeductions] = useState(initialData?.customDeductions || []);
+            const [newDedName, setNewDedName] = useState('');
+            const [newDedAmount, setNewDedAmount] = useState('');
+            const [errors, setErrors] = useState({});
+
+            // Calculations
+            const valNVW = parseFloat(nvw) || 0;
+            const valPenalty = parseFloat(penalty) || 0;
+            const valCustomDed = customDeductions.reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
+            
+            const valGST = valNVW * (gstRate / 100);
+            const valGross = valNVW + valGST;
+            
+            const valIT = valGross * (itRate / 100);
+            const valCess = valGross * (cessRate / 100);
+            
+            const totalDeductions = valIT + valCess + valPenalty + valCustomDed;
+            const netPayable = valGross - totalDeductions;
+
+            // Validation
+            const validateForm = () => {
+                const newErrors = {};
+                if (!nvw || parseFloat(nvw) <= 0) newErrors.nvw = 'NVW must be greater than 0';
+                if (!billDate) newErrors.billDate = 'Bill date is required';
+                setErrors(newErrors);
+                return Object.keys(newErrors).length === 0;
+            };
+
+            // Custom Deduction Handlers
+            const addCustomDeduction = () => {
+                if(!newDedName || !newDedAmount) return;
+                
+                const amount = parseFloat(newDedAmount);
+                if (amount <= 0) {
+                    setErrors({...errors, customDeduction: 'Amount must be greater than 0'});
+                    return;
+                }
+
+                setCustomDeductions([...customDeductions, {
+                    id: generateId(),
+                    name: newDedName,
+                    amount: amount
+                }]);
+                setNewDedName('');
+                setNewDedAmount('');
+                setErrors({...errors, customDeduction: null});
+            };
+
+            const removeCustomDeduction = (id) => {
+                setCustomDeductions(customDeductions.filter(d => d.id !== id));
+            };
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                if (!validateForm()) return;
+                
+                onSave({
+                    id: initialData?.id || generateId(),
+                    workId: work.id,
+                    billNumber: billNum,
+                    date: billDate,
+                    nvw: valNVW,
+                    gstRate,
+                    gstAmount: valGST,
+                    grossAmount: valGross,
+                    itRate, 
+                    cessRate,
+                    it: valIT,
+                    cess: valCess,
+                    penalty: valPenalty,
+                    customDeductions,
+                    totalDeductions,
+                    netPayable,
+                    createdAt: initialData?.createdAt || new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                });
+            };
+
+            return (
+                <div className="flex flex-col h-screen bg-white page-enter">
+                    <div className="flex items-center p-4 border-b sticky top-0 bg-white z-20">
+                        <button onClick={onBack} className="p-2 -ml-2 text-gray-600 hover:bg-gray-100 rounded transition-colors">
+                            <Icon name="x" />
+                        </button>
+                        <h2 className="text-lg font-bold ml-2">
+                            {isEditing ? `Edit Bill #${billNum}` : `New Running Bill #${billNum}`}
+                        </h2>
+                    </div>
+
+                    <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar">
+                        
+                        {/* Bill Date Field */}
+                        <div className={`bg-gray-50 p-3 rounded-lg border transition-colors ${
+                            errors.billDate ? 'border-red-300 bg-red-50' : 'border-gray-200'
+                        }`}>
+                            <label className="text-xs text-gray-500 uppercase font-semibold block mb-1">Bill Creation Date *</label>
+                            <input 
+                                type="date" 
+                                className="w-full bg-transparent text-lg font-bold outline-none text-gray-900"
+                                value={billDate}
+                                onChange={e => {
+                                    setBillDate(e.target.value);
+                                    if (errors.billDate) setErrors({...errors, billDate: null});
+                                }}
+                                required
+                            />
+                            {errors.billDate && <p className="text-red-500 text-xs mt-1">{errors.billDate}</p>}
+                        </div>
+
+                        {/* 1. NVW Input */}
+                        <section>
+                            <MoneyInput 
+                                label="Net Value of Work (NVW) *" 
+                                value={nvw} 
+                                onChange={(value) => {
+                                    setNvw(value);
+                                    if (errors.nvw) setErrors({...errors, nvw: null});
+                                }} 
+                            />
+                            {errors.nvw && <p className="text-red-500 text-xs mt-1 px-3">{errors.nvw}</p>}
+                        </section>
+
+                        {/* 2. Additions */}
+                        <section className="space-y-3">
+                            <h3 className="text-xs font-bold text-blue-600 uppercase tracking-wide flex items-center">
+                                <Icon name="arrow-up-circle" size={14} className="mr-1" /> Additions
+                            </h3>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="p-3 border border-gray-200 rounded-lg hover:border-gray-300 transition-colors">
+                                    <label className="text-xs text-gray-500 block mb-1">GST Rate (%)</label>
+                                    <input 
+                                        type="number" 
+                                        value={gstRate} 
+                                        onChange={e => setGstRate(e.target.value)} 
+                                        className="w-full font-bold outline-none bg-transparent"
+                                        min="0"
+                                        max="100"
+                                        step="0.1"
+                                    />
+                                </div>
+                                <div className="p-3 bg-blue-50 rounded-lg text-right border border-blue-100">
+                                    <label className="text-xs text-blue-500 block mb-1">GST Amount</label>
+                                    <span className="font-bold text-blue-800">{formatCurrency(valGST)}</span>
+                                </div>
+                            </div>
+                            <div className="p-4 bg-gray-800 text-white rounded-lg flex justify-between items-center border border-gray-700">
+                                <span className="text-sm font-medium">Gross Amount</span>
+                                <span className="text-xl font-bold">{formatCurrency(valGross)}</span>
+                            </div>
+                        </section>
+
+                        {/* 3. Deductions */}
+                        <section className="space-y-3">
+                            <h3 className="text-xs font-bold text-red-600 uppercase tracking-wide flex items-center">
+                                <Icon name="arrow-down-circle" size={14} className="mr-1" /> Deductions
+                            </h3>
+                            
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="p-3 border border-gray-200 rounded-lg hover:border-gray-300 transition-colors">
+                                    <label className="text-xs text-gray-500 block mb-1">IT (%)</label>
+                                    <input 
+                                        type="number" 
+                                        value={itRate} 
+                                        onChange={e => setItRate(e.target.value)} 
+                                        className="w-full font-bold outline-none bg-transparent"
+                                        min="0"
+                                        max="100"
+                                        step="0.1"
+                                    />
+                                </div>
+                                <div className="p-3 bg-red-50 rounded-lg text-right border border-red-100">
+                                    <label className="text-xs text-red-500 block mb-1">IT Amount</label>
+                                    <span className="font-bold text-red-800">{formatCurrency(valIT)}</span>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="p-3 border border-gray-200 rounded-lg hover:border-gray-300 transition-colors">
+                                    <label className="text-xs text-gray-500 block mb-1">Cess (%)</label>
+                                    <input 
+                                        type="number" 
+                                        value={cessRate} 
+                                        onChange={e => setCessRate(e.target.value)} 
+                                        className="w-full font-bold outline-none bg-transparent"
+                                        min="0"
+                                        max="100"
+                                        step="0.1"
+                                    />
+                                </div>
+                                <div className="p-3 bg-red-50 rounded-lg text-right border border-red-100">
+                                    <label className="text-xs text-red-500 block mb-1">Cess Amount</label>
+                                    <span className="font-bold text-red-800">{formatCurrency(valCess)}</span>
+                                </div>
+                            </div>
+
+                            {/* Custom Deductions */}
+                            <div className="bg-red-50 p-4 rounded-xl border border-red-100">
+                                <h4 className="text-xs font-bold text-red-800 uppercase mb-3">Additional Deductions</h4>
+                                
+                                {/* List of added deductions */}
+                                {customDeductions.length > 0 && (
+                                    <div className="mb-3 space-y-2">
+                                        {customDeductions.map(d => (
+                                            <div key={d.id} className="flex justify-between items-center bg-white p-2 rounded border border-red-100 hover:border-red-200 transition-colors">
+                                                <span className="text-sm text-gray-700">{d.name}</span>
+                                                <div className="flex items-center">
+                                                    <span className="text-sm font-bold text-red-600 mr-2">-{formatCurrency(d.amount)}</span>
+                                                    <button 
+                                                        type="button" 
+                                                        onClick={() => removeCustomDeduction(d.id)} 
+                                                        className="text-red-300 hover:text-red-500 transition-colors"
+                                                    >
+                                                        <Icon name="x-circle" size={16} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {/* Add new deduction */}
+                                <div className="flex gap-2 items-center">
+                                    <input 
+                                        type="text" 
+                                        placeholder="Name (e.g. Security)" 
+                                        className="flex-1 p-2 text-sm border border-gray-300 rounded focus:outline-none focus:border-red-400 transition-colors"
+                                        value={newDedName}
+                                        onChange={e => setNewDedName(e.target.value)}
+                                    />
+                                    <input 
+                                        type="number" 
+                                        placeholder="₹ Amt" 
+                                        className="w-20 p-2 text-sm border border-gray-300 rounded focus:outline-none focus:border-red-400 transition-colors"
+                                        value={newDedAmount}
+                                        onChange={e => {
+                                            setNewDedAmount(e.target.value);
+                                            if (errors.customDeduction) setErrors({...errors, customDeduction: null});
+                                        }}
+                                        min="0"
+                                        step="0.01"
+                                    />
+                                    <button 
+                                        type="button"
+                                        onClick={addCustomDeduction}
+                                        disabled={!newDedName || !newDedAmount}
+                                        className="bg-red-600 text-white p-2 rounded hover:bg-red-700 disabled:bg-red-200 transition-colors"
+                                    >
+                                        <Icon name="plus" size={16} />
+                                    </button>
+                                </div>
+                                {errors.customDeduction && <p className="text-red-500 text-xs mt-1">{errors.customDeduction}</p>}
+                            </div>
+
+                            <MoneyInput 
+                                label="Other Misc. Penalties" 
+                                value={penalty} 
+                                onChange={setPenalty} 
+                                isNegative={true} 
+                            />
+                            
+                            <div className="flex justify-between text-sm text-red-600 font-semibold px-2 border-t border-red-100 pt-2">
+                                <span>Total Deductions</span>
+                                <span>- {formatCurrency(totalDeductions)}</span>
+                            </div>
+                        </section>
+
+                        {/* 4. Final Summary */}
+                        <div className="pt-4 pb-24">
+                            <div className="border-t-2 border-gray-100 pt-4">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-lg font-bold text-gray-800">Net Payable</span>
+                                    <span className="text-2xl font-bold text-green-600">{formatCurrency(netPayable)}</span>
+                                </div>
+                                <div className="mt-2 text-xs text-gray-500 text-center">
+                                    {netPayable < 0 && (
+                                        <p className="text-red-500 font-semibold">Warning: Net payable is negative!</p>
+                                    )}
+                                    <p>Bill will be saved to {work.name}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+
+                    {/* Submit Footer */}
+                    <div className="fixed bottom-0 left-0 w-full p-4 bg-white border-t">
+                        <button 
+                            onClick={handleSubmit}
+                            disabled={!nvw || parseFloat(nvw) <= 0}
+                            className={`w-full py-3.5 rounded-xl font-bold text-white shadow-lg transition-all ${
+                                !nvw || parseFloat(nvw) <= 0 
+                                ? 'bg-gray-300 cursor-not-allowed' 
+                                : 'bg-green-600 hover:bg-green-700 active:bg-green-800'
+                            }`}
+                        >
+                            {isEditing ? 'Update Bill' : `Save Bill #${billNum}`}
+                        </button>
+                    </div>
+                </div>
+            );
+        };
+
+        // Render the app
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
+[file content end]
